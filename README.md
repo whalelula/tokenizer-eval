@@ -25,7 +25,36 @@
 ```powershell
 conda create -n tokenizer-eval python=3.10 -y
 conda activate tokenizer-eval
+```
+
+然后先手动安装固定版本 PyTorch。GPU / CUDA 11.8 环境，例如 AutoDL CUDA 11.8：
+
+```powershell
+pip install torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
+```
+
+本地 CPU 环境：
+
+```powershell
+pip install torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+```
+
+最后安装本项目。只准备 NSynth manifest 时，基础安装即可：
+
+```powershell
 pip install -e .
+```
+
+如果要跑 MERT + t-SNE/指标/画图：
+
+```powershell
+pip install -e ".[mert,viz]"
+```
+
+如果要同时跑 SAME + MERT + t-SNE/指标/画图：
+
+```powershell
+pip install -e ".[same,mert,viz]"
 ```
 
 方案 B：使用 Python venv。
@@ -33,13 +62,23 @@ pip install -e .
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
 pip install -e .
 ```
 
-如果要跑 SAME，还需要安装官方 SAME 代码：
+说明：`pyproject.toml` 里没有把 `torch/torchaudio` 放进基础依赖，是为了避免 `pip install -e .` 自动解析到较新的 PyTorch / CUDA 依赖，并额外下载很多几百 MB 的 NVIDIA wheel。`transformers`、`matplotlib`、`scikit-learn` 也被放进可选依赖，避免只准备数据时安装过多包。请根据运行环境先手动安装 PyTorch，再按任务安装本项目 extras。
+
+可选依赖说明：
+
+- `mert`：安装 `transformers`，用于 MERT 推理。
+- `viz`：安装 `matplotlib` 和 `scikit-learn`，用于 t-SNE、指标和可视化。
+- `same`：安装官方 `stable-audio-3`，用于 SAME 推理。
+- `eval`：等价于 `mert + viz`，不包含 SAME。
+
+如果只要跑 SAME，还需要安装官方 SAME 代码：
 
 ```powershell
-pip install "tokenizer-evaluation[same]"
+pip install -e ".[same,viz]"
 ```
 
 如果上面的 Git 依赖安装失败，也可以直接安装官方仓库：
@@ -51,13 +90,13 @@ pip install git+https://github.com/Stability-AI/stable-audio-3.git
 如果本地 pip 下载依赖较慢或 PyPI 连接失败，可以改用国内镜像源安装。清华源：
 
 ```powershell
-pip install -e ".[same]" -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install -e ".[same,mert,viz]" -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 阿里云源：
 
 ```powershell
-pip install -e ".[same]" -i https://mirrors.aliyun.com/pypi/simple
+pip install -e ".[same,mert,viz]" -i https://mirrors.aliyun.com/pypi/simple
 ```
 
 也可以只给官方 SAME 仓库安装时的 PyPI 依赖使用镜像源：
