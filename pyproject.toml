@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokenizer-evaluation"
+version = "0.1.0"
+description = "Evaluation framework for pretrained audio tokenizers and representation models."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.8",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.3",
+    "torch>=2.1",
+    "torchaudio>=2.1",
+    "tqdm>=4.66",
+    "transformers>=4.40",
+]
+
+[project.optional-dependencies]
+same = [
+    "stable-audio-3 @ git+https://github.com/Stability-AI/stable-audio-3.git",
+]
+dev = [
+    "ruff>=0.5",
+]
+
+[project.scripts]
+prepare-nsynth = "tokenizer_evaluation.cli.prepare_nsynth:main"
+extract-tokenizer-embeddings = "tokenizer_evaluation.cli.extract_embeddings:main"
+run-instrument-tsne = "tokenizer_evaluation.cli.run_instrument_tsne:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

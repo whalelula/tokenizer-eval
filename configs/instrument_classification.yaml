@@ -1,0 +1,50 @@
+dataset:
+  split: valid
+  manifest: outputs/nsynth_valid_manifest.csv
+  max_per_family: 200
+  seed: 42
+  families: []
+  sources: []
+  pitch_min:
+  pitch_max:
+
+runtime:
+  # Default is GPU inference. Use --device cpu on a local CPU-only machine.
+  device: cuda
+  dtype: auto
+  batch_size: 1
+  max_duration_seconds: 4.0
+  overwrite: false
+
+models:
+  same:
+    enabled: true
+    model_name: same-s
+    pooling: mean
+    chunked: false
+    # SAME chunk_size/overlap are measured in latent frames, not seconds.
+    chunk_size: 128
+    overlap: 32
+  mert:
+    enabled: true
+    model_name: m-a-p/MERT-v1-95M
+    layer: -1
+    pooling: mean
+
+tsne:
+  perplexity: 30
+  learning_rate: auto
+  n_iter: 1500
+  init: pca
+  pca_dim: 50
+  seed: 42
+
+metrics:
+  enabled: true
+  knn_neighbors: 5
+  test_size: 0.25
+  seed: 42
+
+output:
+  dir: outputs/nsynth_instrument
+  dpi: 220
