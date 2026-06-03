@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from tokenizer_evaluation.audio import load_audio
-from tokenizer_evaluation.models.base import LoopingExtractor, resolve_device, should_use_half
+from tokenizer_evaluation.models.base import LoopingExtractor, resolve_device
 
 
 class MERTExtractor(LoopingExtractor):
@@ -43,8 +43,6 @@ class MERTExtractor(LoopingExtractor):
             trust_remote_code=trust_remote_code,
         )
         self.model.eval().to(self.device)
-        if should_use_half(self.device, dtype):
-            self.model.half()
         self._torch = torch
 
     def extract_one(self, audio_path: str | Path) -> np.ndarray:

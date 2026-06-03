@@ -119,6 +119,7 @@ prepare-nsynth `
   --manifest outputs/nsynth_valid_manifest.csv `
   --max-per-family 200
 ```
+
 或者下载 `test`
 
 ```powershell
@@ -126,6 +127,12 @@ prepare-nsynth `
   --nsynth-root data/nsynth `
   --split test `
   --download `
+  --manifest outputs/nsynth_test_manifest.csv `
+  --max-per-family 50
+
+prepare-nsynth `
+  --nsynth-root data/nsynth `
+  --split test `
   --manifest outputs/nsynth_test_manifest.csv `
   --max-per-family 50
 ```
@@ -142,6 +149,17 @@ data/nsynth/nsynth-valid/audio/*.wav
 ```text
 data/nsynth/examples.json
 data/nsynth/audio/*.wav
+```
+
+## HF镜像下载模型
+
+autodl服务器上下载模型会遇到问题，需要使用镜像下载
+
+```
+export HF_ENDPOINT=https://hf-mirror.com
+export HF_HOME=/root/autodl-tmp/huggingface
+export TRANSFORMERS_CACHE=/root/autodl-tmp/huggingface
+export HF_HUB_ENABLE_HF_TRANSFER=0
 ```
 
 ## 一键运行 SAME + MERT t-SNE

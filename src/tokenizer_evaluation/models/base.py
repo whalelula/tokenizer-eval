@@ -24,9 +24,7 @@ def resolve_device(device: str):
 def should_use_half(device, dtype: str) -> bool:
     if dtype == "float16":
         return str(device).startswith("cuda")
-    if dtype == "float32":
-        return False
-    return str(device).startswith("cuda")
+    return False
 
 
 class EmbeddingExtractor(Protocol):

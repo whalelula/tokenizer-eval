@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from tokenizer_evaluation.audio import ensure_stereo, load_audio
-from tokenizer_evaluation.models.base import LoopingExtractor, resolve_device, should_use_half
+from tokenizer_evaluation.models.base import LoopingExtractor, resolve_device
 
 
 class SAMEExtractor(LoopingExtractor):
@@ -43,8 +43,6 @@ class SAMEExtractor(LoopingExtractor):
             self.model.eval()
         if hasattr(self.model, "to"):
             self.model.to(self.device)
-            if should_use_half(self.device, dtype):
-                self.model.to(dtype=torch.float16)
         self._torch = torch
 
     def extract_one(self, audio_path: str | Path) -> np.ndarray:
@@ -55,8 +53,6 @@ class SAMEExtractor(LoopingExtractor):
             max_duration_seconds=self.max_duration_seconds,
         )
         waveform = ensure_stereo(waveform).to(self.device)
-        if should_use_half(self.device, self.dtype):
-            waveform = waveform.half()
 
         with self._torch.inference_mode():
             latents = self._encode(waveform, sample_rate)

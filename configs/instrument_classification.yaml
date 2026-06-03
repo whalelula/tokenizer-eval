@@ -27,8 +27,8 @@ models:
     overlap: 32
   mert:
     enabled: true
-    model_name: m-a-p/MERT-v1-95M
-    layer: -1
+    model_name: m-a-p/MERT-v1-330M
+    layer: 12
     pooling: mean
 
 tsne:
