@@ -29,6 +29,7 @@ models:
     enabled: true
     model_name: m-a-p/MERT-v1-330M
     layer: 12
+    # For multi-layer comparison, either pass --mert-layers or set layers: [6, 12, 18, 24].
     pooling: mean
 
 tsne:

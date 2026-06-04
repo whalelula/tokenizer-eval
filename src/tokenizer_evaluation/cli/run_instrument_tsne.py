@@ -15,6 +15,61 @@ from tokenizer_evaluation.reduction import run_tsne
 from tokenizer_evaluation.visualization import save_comparison_plot, save_tsne_plot
 
 
+def _format_model_label(model_key: str, model_cfg: dict[str, Any]) -> str:
+    model_name = str(model_cfg.get("model_name", model_key))
+    display_name = model_name.rsplit("/", maxsplit=1)[-1]
+    if model_key == "mert" and "layer" in model_cfg:
+        return f"{display_name} (layer {model_cfg['layer']})"
+    return display_name
+
+
+def _format_tsne_annotation(
+    *,
+    model_label: str,
+    total_samples: int,
+    max_per_family: int | None,
+    perplexity: float,
+) -> str:
+    max_per_family_label = "none" if max_per_family is None else str(max_per_family)
+    return (
+        f"Model: {model_label}\n"
+        f"Samples: {total_samples} | "
+        f"max-per-family: {max_per_family_label} | "
+        f"t-SNE perplexity: {perplexity:g}"
+    )
+
+
+def _build_run_specs(
+    model_keys: list[str],
+    models_cfg: dict[str, Any],
+    mert_layers: list[int] | None,
+) -> list[tuple[str, str, str, dict[str, Any]]]:
+    specs = []
+    for model_key in model_keys:
+        model_cfg = dict(models_cfg.get(model_key, {}))
+        model_cfg.pop("layers", None)
+        if model_key == "mert" and mert_layers:
+            for layer in mert_layers:
+                layer_cfg = dict(model_cfg)
+                layer_cfg["layer"] = layer
+                specs.append((f"mert_layer_{layer}", "mert", f"MERT L{layer}", layer_cfg))
+        else:
+            specs.append((model_key, model_key, model_key.upper(), model_cfg))
+    return specs
+
+
+def _default_comparison_filename(run_specs: list[tuple[str, str, str, dict[str, Any]]]) -> str:
+    if run_specs and all(extractor_key == "mert" for _, extractor_key, _, _ in run_specs):
+        layers = [
+            str(model_cfg["layer"])
+            for _, _, _, model_cfg in run_specs
+            if "layer" in model_cfg
+        ]
+        if len(layers) == len(run_specs) and len(layers) > 1:
+            return "mert_layers_tsne.png"
+    return "same_vs_mert_tsne.png"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run SAME/MERT NSynth instrument t-SNE evaluation.")
     parser.add_argument("--config", default=Path("configs/instrument_classification.yaml"), type=Path)
@@ -23,6 +78,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", default=None, type=Path)
     parser.add_argument("--output-dir", default=None, type=Path)
     parser.add_argument("--models", nargs="+", default=None, choices=["same", "mert"])
+    parser.add_argument("--mert-layers", nargs="+", default=None, type=int)
+    parser.add_argument("--comparison-name", default=None)
     parser.add_argument("--device", default=None)
     parser.add_argument("--dtype", default=None, choices=["auto", "float16", "float32"])
     parser.add_argument("--batch-size", default=None, type=int)
@@ -63,23 +120,30 @@ def main() -> None:
         download=args.download,
     )
     manifest = prepare_nsynth_manifest(prepare_cfg)
+    total_samples = len(manifest)
+    max_per_family = prepare_cfg.max_per_family
 
     device = args.device or runtime_cfg.get("device", "cuda")
     dtype = args.dtype or runtime_cfg.get("dtype", "auto")
     batch_size = args.batch_size or int(runtime_cfg.get("batch_size", 1))
     overwrite = bool(args.overwrite or runtime_cfg.get("overwrite", False))
     max_duration = runtime_cfg.get("max_duration_seconds", 4.0)
+    perplexity = float(tsne_cfg.get("perplexity", 30))
     model_keys = args.models or [
         name for name, model_cfg in models_cfg.items() if model_cfg.get("enabled", True)
     ]
+    mert_layers = args.mert_layers or models_cfg.get("mert", {}).get("layers")
+    if mert_layers is not None:
+        mert_layers = [int(layer) for layer in mert_layers]
+    run_specs = _build_run_specs(model_keys, models_cfg, mert_layers)
 
     panels = []
-    for model_key in model_keys:
-        model_output_dir = output_dir / model_key
+    for run_key, extractor_key, plot_title, model_cfg in run_specs:
+        model_output_dir = output_dir / run_key
         model_output_dir.mkdir(parents=True, exist_ok=True)
         extractor = build_extractor(
-            model_key,
-            models_cfg.get(model_key, {}),
+            extractor_key,
+            model_cfg,
             device=device,
             dtype=dtype,
             max_duration_seconds=max_duration,
@@ -95,7 +159,7 @@ def main() -> None:
 
         coords = run_tsne(
             embeddings,
-            perplexity=float(tsne_cfg.get("perplexity", 30)),
+            perplexity=perplexity,
             learning_rate=tsne_cfg.get("learning_rate", "auto"),
             n_iter=int(tsne_cfg.get("n_iter", 1500)),
             init=str(tsne_cfg.get("init", "pca")),
@@ -107,12 +171,20 @@ def main() -> None:
         coords_frame.insert(0, "tsne_y", coords[:, 1])
         coords_frame.insert(0, "tsne_x", coords[:, 0])
         coords_frame.to_csv(coords_path, index=False)
+        model_label = _format_model_label(extractor_key, model_cfg)
+        annotation = _format_tsne_annotation(
+            model_label=model_label,
+            total_samples=total_samples,
+            max_per_family=max_per_family,
+            perplexity=perplexity,
+        )
         save_tsne_plot(
             coords,
             metadata,
-            title=model_key.upper(),
+            title=plot_title,
             output_path=model_output_dir / "tsne.png",
             dpi=int(output_cfg.get("dpi", 220)),
+            annotation=annotation,
         )
 
         if metrics_cfg.get("enabled", True):
@@ -125,11 +197,11 @@ def main() -> None:
             )
             save_metrics(metrics, model_output_dir / "metrics.json")
 
-        panels.append((model_key.upper(), coords, metadata))
+        panels.append((plot_title, coords, metadata, annotation))
 
     save_comparison_plot(
         panels,
-        output_dir / "same_vs_mert_tsne.png",
+        output_dir / (args.comparison_name or _default_comparison_filename(run_specs)),
         dpi=int(output_cfg.get("dpi", 220)),
     )
     print(f"Finished. Outputs saved under {output_dir}")

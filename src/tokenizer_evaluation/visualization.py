@@ -28,24 +28,27 @@ def save_tsne_plot(
     output_path: str | Path,
     label_col: str = "instrument_family_str",
     dpi: int = 220,
+    annotation: str | None = None,
 ) -> None:
     import matplotlib.pyplot as plt
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(6.2, 5.2), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(6.2, 5.7), constrained_layout=True)
     _scatter(ax, coords, metadata, label_col=label_col)
     ax.set_title(title, fontsize=18, fontweight="bold")
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_xlabel("")
     ax.set_ylabel("")
-    fig.savefig(output_path, dpi=dpi)
+    if annotation:
+        fig.text(0.5, 0.02, annotation, ha="center", va="bottom", fontsize=9)
+    fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
 def save_comparison_plot(
-    panels: list[tuple[str, np.ndarray, pd.DataFrame]],
+    panels: list[tuple[str, np.ndarray, pd.DataFrame] | tuple[str, np.ndarray, pd.DataFrame, str]],
     output_path: str | Path,
     label_col: str = "instrument_family_str",
     dpi: int = 220,
@@ -55,19 +58,31 @@ def save_comparison_plot(
     if not panels:
         raise ValueError("At least one panel is required.")
 
-    labels = sorted({label for _, _, meta in panels for label in meta[label_col].astype(str).unique()})
+    labels = sorted({label for panel in panels for label in panel[2][label_col].astype(str).unique()})
     palette = {label: DEFAULT_PALETTE[index % len(DEFAULT_PALETTE)] for index, label in enumerate(labels)}
     fig_width = max(6.0, 5.2 * len(panels))
-    fig, axes = plt.subplots(1, len(panels), figsize=(fig_width, 5.6), constrained_layout=True)
+    fig, axes = plt.subplots(1, len(panels), figsize=(fig_width, 6.2), constrained_layout=True)
     if len(panels) == 1:
         axes = [axes]
 
-    for index, (title, coords, metadata) in enumerate(panels):
+    for index, panel in enumerate(panels):
+        title, coords, metadata = panel[:3]
+        annotation = panel[3] if len(panel) > 3 else None
         ax = axes[index]
         _scatter(ax, coords, metadata, label_col=label_col, palette=palette)
         ax.set_title(f"({chr(97 + index)}) {title}", fontsize=18, fontweight="bold")
         ax.set_xticks([])
         ax.set_yticks([])
+        if annotation:
+            ax.text(
+                0.5,
+                -0.08,
+                annotation,
+                transform=ax.transAxes,
+                ha="center",
+                va="top",
+                fontsize=9,
+            )
 
     handles = [
         plt.Line2D(
@@ -92,7 +107,7 @@ def save_comparison_plot(
         title_fontsize=14,
         fontsize=10,
     )
-    fig.savefig(output_path, dpi=dpi)
+    fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
