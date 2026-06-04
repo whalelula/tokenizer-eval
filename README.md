@@ -156,10 +156,10 @@ data/nsynth/audio/*.wav
 autodl服务器上下载模型会遇到问题，需要使用镜像下载
 
 ```
-export HF_ENDPOINT=https://hf-mirror.com
-export HF_HOME=/root/autodl-tmp/huggingface
-export TRANSFORMERS_CACHE=/root/autodl-tmp/huggingface
-export HF_HUB_ENABLE_HF_TRANSFER=0
+export HF_ENDPOINT=https://hf-mirror.com \
+export HF_HOME=/root/autodl-tmp/huggingface \
+export TRANSFORMERS_CACHE=/root/autodl-tmp/huggingface \
+export HF_HUB_ENABLE_HF_TRANSFER=0 
 ```
 
 ## 一键运行 SAME + MERT t-SNE

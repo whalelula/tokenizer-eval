@@ -34,7 +34,7 @@ models:
     pooling: mean
 
 tsne:
-  perplexity: 30
+  perplexity: 15
   learning_rate: auto
   n_iter: 1500
   init: pca
