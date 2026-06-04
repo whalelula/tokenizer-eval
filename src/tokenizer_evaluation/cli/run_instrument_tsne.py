@@ -39,20 +39,31 @@ def _format_tsne_annotation(
     )
 
 
+def _slug(value: str) -> str:
+    return "".join(char.lower() if char.isalnum() else "_" for char in value).strip("_")
+
+
 def _build_run_specs(
     model_keys: list[str],
     models_cfg: dict[str, Any],
     mert_layers: list[int] | None,
+    same_models: list[str] | None,
 ) -> list[tuple[str, str, str, dict[str, Any]]]:
     specs = []
     for model_key in model_keys:
         model_cfg = dict(models_cfg.get(model_key, {}))
         model_cfg.pop("layers", None)
+        model_cfg.pop("model_names", None)
         if model_key == "mert" and mert_layers:
             for layer in mert_layers:
                 layer_cfg = dict(model_cfg)
                 layer_cfg["layer"] = layer
                 specs.append((f"mert_layer_{layer}", "mert", f"MERT L{layer}", layer_cfg))
+        elif model_key == "same" and same_models:
+            for same_model in same_models:
+                same_cfg = dict(model_cfg)
+                same_cfg["model_name"] = same_model
+                specs.append((f"same_{_slug(same_model)}", "same", same_model.upper(), same_cfg))
         else:
             specs.append((model_key, model_key, model_key.upper(), model_cfg))
     return specs
@@ -67,6 +78,8 @@ def _default_comparison_filename(run_specs: list[tuple[str, str, str, dict[str, 
         ]
         if len(layers) == len(run_specs) and len(layers) > 1:
             return "mert_layers_tsne.png"
+    if run_specs and {extractor_key for _, extractor_key, _, _ in run_specs} == {"same", "mert"}:
+        return "same_models_mert_layers_tsne.png"
     return "same_vs_mert_tsne.png"
 
 
@@ -79,6 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", default=None, type=Path)
     parser.add_argument("--models", nargs="+", default=None, choices=["same", "mert"])
     parser.add_argument("--mert-layers", nargs="+", default=None, type=int)
+    parser.add_argument("--same-models", nargs="+", default=None)
     parser.add_argument("--comparison-name", default=None)
     parser.add_argument("--device", default=None)
     parser.add_argument("--dtype", default=None, choices=["auto", "float16", "float32"])
@@ -135,7 +149,10 @@ def main() -> None:
     mert_layers = args.mert_layers or models_cfg.get("mert", {}).get("layers")
     if mert_layers is not None:
         mert_layers = [int(layer) for layer in mert_layers]
-    run_specs = _build_run_specs(model_keys, models_cfg, mert_layers)
+    same_models = args.same_models or models_cfg.get("same", {}).get("model_names")
+    if same_models is not None:
+        same_models = [str(model_name) for model_name in same_models]
+    run_specs = _build_run_specs(model_keys, models_cfg, mert_layers, same_models)
 
     panels = []
     for run_key, extractor_key, plot_title, model_cfg in run_specs:

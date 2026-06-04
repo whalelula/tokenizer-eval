@@ -20,6 +20,7 @@ models:
   same:
     enabled: true
     model_name: same-s
+    # For SAME-S/SAME-L comparison, either pass --same-models or set model_names: [same-s, same-l].
     pooling: mean
     chunked: false
     # SAME chunk_size/overlap are measured in latent frames, not seconds.
