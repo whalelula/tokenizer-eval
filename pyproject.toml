@@ -39,6 +39,7 @@ dev = [
 prepare-nsynth = "tokenizer_evaluation.cli.prepare_nsynth:main"
 extract-tokenizer-embeddings = "tokenizer_evaluation.cli.extract_embeddings:main"
 run-instrument-tsne = "tokenizer_evaluation.cli.run_instrument_tsne:main"
+run-knn-purity = "tokenizer_evaluation.cli.run_knn_purity:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

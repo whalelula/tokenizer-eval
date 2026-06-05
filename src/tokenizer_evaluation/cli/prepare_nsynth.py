@@ -16,6 +16,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sources", nargs="*", default=[])
     parser.add_argument("--pitch-min", default=None, type=int)
     parser.add_argument("--pitch-max", default=None, type=int)
+    parser.add_argument(
+        "--pitch-stratified",
+        action="store_true",
+        help=(
+            "Sample by pitch strata, prioritizing equal family counts within each pitch "
+            "and then balanced family totals."
+        ),
+    )
+    parser.add_argument("--pitch-bin-size", default=1, type=int)
+    parser.add_argument("--max-per-pitch", default=None, type=int)
+    parser.add_argument(
+        "--keep-incomplete-pitch-strata",
+        action="store_true",
+        help="Keep pitch strata that do not contain every selected instrument family.",
+    )
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--download", action="store_true")
     return parser
@@ -32,6 +47,10 @@ def main() -> None:
         sources=tuple(args.sources),
         pitch_min=args.pitch_min,
         pitch_max=args.pitch_max,
+        pitch_stratified=args.pitch_stratified,
+        pitch_bin_size=args.pitch_bin_size,
+        max_per_pitch=args.max_per_pitch,
+        pitch_require_all_families=not args.keep_incomplete_pitch_strata,
         seed=args.seed,
         download=args.download,
     )

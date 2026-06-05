@@ -31,6 +31,10 @@ class NSynthPrepareConfig:
     sources: tuple[str, ...] = ()
     pitch_min: int | None = None
     pitch_max: int | None = None
+    pitch_stratified: bool = False
+    pitch_bin_size: int = 1
+    max_per_pitch: int | None = None
+    pitch_require_all_families: bool = True
     seed: int = 42
     download: bool = False
 
@@ -292,6 +296,182 @@ def balanced_sample(
     return pd.concat(sampled_parts, axis=0).sample(frac=1.0, random_state=seed).reset_index(drop=True)
 
 
+def pitch_stratified_sample(
+    frame: pd.DataFrame,
+    *,
+    label_col: str = "instrument_family_str",
+    pitch_col: str = "pitch",
+    max_per_label: int | None = None,
+    max_per_pitch: int | None = None,
+    pitch_bin_size: int = 1,
+    require_all_labels_per_pitch: bool = True,
+    seed: int = 42,
+    reset_index: bool = True,
+) -> pd.DataFrame:
+    """Sample by pitch first, keeping family counts equal within each pitch.
+
+    The primary target is to make each pitch stratum contribute the same number
+    of examples for every instrument family. The secondary target is balanced
+    total family counts, which follows naturally when every retained pitch uses
+    the same per-family quota.
+    """
+    if frame.empty:
+        return frame.reset_index(drop=True) if reset_index else frame.copy()
+    if label_col not in frame.columns:
+        raise ValueError(f"Missing label column for stratified sampling: {label_col}")
+    if pitch_col not in frame.columns:
+        raise ValueError(f"Missing pitch column for stratified sampling: {pitch_col}")
+    if pitch_bin_size <= 0:
+        raise ValueError("pitch_bin_size must be positive.")
+
+    working = frame.copy()
+    working["_pitch_value"] = pd.to_numeric(working[pitch_col], errors="coerce")
+    working = working.dropna(subset=["_pitch_value", label_col])
+    if working.empty:
+        return working.drop(columns=["_pitch_value"]).reset_index(drop=True)
+
+    working["_pitch_value"] = working["_pitch_value"].astype(int)
+    min_pitch = int(working["_pitch_value"].min())
+    if pitch_bin_size == 1:
+        working["_pitch_stratum"] = working["_pitch_value"]
+    else:
+        offsets = (working["_pitch_value"] - min_pitch) // pitch_bin_size
+        working["_pitch_stratum"] = min_pitch + offsets * pitch_bin_size
+
+    working[label_col] = working[label_col].astype(str)
+    labels = sorted(working[label_col].unique())
+    if require_all_labels_per_pitch:
+        coverage = working.groupby("_pitch_stratum")[label_col].nunique()
+        complete_strata = coverage[coverage == len(labels)].index
+        working = working[working["_pitch_stratum"].isin(complete_strata)]
+        if working.empty:
+            raise ValueError("No pitch strata contain all requested labels.")
+
+    labels = sorted(working[label_col].unique())
+    pitch_strata = sorted(working["_pitch_stratum"].unique())
+    if not labels or not pitch_strata:
+        cleaned = working.drop(columns=["_pitch_value", "_pitch_stratum"])
+        return cleaned.reset_index(drop=True) if reset_index else cleaned
+
+    max_per_label = _normalize_positive_int(max_per_label)
+    max_per_pitch = _normalize_positive_int(max_per_pitch)
+
+    cell_counts = (
+        working.groupby(["_pitch_stratum", label_col])
+        .size()
+        .unstack(fill_value=0)
+        .reindex(index=pitch_strata, columns=labels, fill_value=0)
+    )
+    per_pitch_cell_capacity = cell_counts.min(axis=1).astype(int).to_dict()
+    if max_per_pitch is not None:
+        per_pitch_cap = max_per_pitch // len(labels)
+        per_pitch_cell_capacity = {
+            pitch: min(capacity, per_pitch_cap)
+            for pitch, capacity in per_pitch_cell_capacity.items()
+        }
+    per_pitch_cell_capacity = {
+        pitch: capacity
+        for pitch, capacity in per_pitch_cell_capacity.items()
+        if capacity > 0
+    }
+    if not per_pitch_cell_capacity:
+        raise ValueError("No pitch strata have enough samples for pitch-family balancing.")
+
+    per_label_capacity = sum(per_pitch_cell_capacity.values())
+    target_per_label = (
+        per_label_capacity
+        if max_per_label is None
+        else min(max_per_label, per_label_capacity)
+    )
+    if target_per_label <= 0:
+        cleaned = working.drop(columns=["_pitch_value", "_pitch_stratum"])
+        return cleaned.iloc[0:0].reset_index(drop=True) if reset_index else cleaned.iloc[0:0]
+
+    rng = random.Random(seed)
+    per_pitch_family_targets = _allocate_even_targets(
+        list(per_pitch_cell_capacity),
+        per_pitch_cell_capacity,
+        target_per_label,
+        max_per_group=None,
+        rng=rng,
+    )
+
+    pools: dict[tuple[object, str], list[int]] = {}
+    for (pitch, label), group in working.groupby(["_pitch_stratum", label_col], sort=True):
+        indices = list(group.index)
+        rng.shuffle(indices)
+        pools[(pitch, str(label))] = indices
+
+    selected: list[int] = []
+    for pitch in sorted(per_pitch_family_targets):
+        quota = int(per_pitch_family_targets[pitch])
+        if quota <= 0:
+            continue
+        for label in labels:
+            selected.extend(pools[(pitch, label)][:quota])
+    sampled = working.loc[selected].drop(columns=["_pitch_value", "_pitch_stratum"])
+    sampled = sampled.sample(frac=1.0, random_state=seed)
+    return sampled.reset_index(drop=True) if reset_index else sampled
+
+
+def _normalize_positive_int(value: int | None) -> int | None:
+    if value is None:
+        return None
+    value = int(value)
+    return value if value > 0 else None
+
+
+def _allocate_even_targets(
+    keys: list[object],
+    capacities: dict[object, int],
+    total: int,
+    *,
+    max_per_group: int | None,
+    rng: random.Random,
+) -> dict[object, int]:
+    keys = list(keys)
+    if not keys:
+        return {}
+
+    group_limit = max_per_group
+    if group_limit is None:
+        group_limit = max(capacities.values()) if capacities else 0
+    capped_capacities = {
+        key: min(int(capacities.get(key, 0)), int(group_limit))
+        for key in keys
+    }
+    total = min(int(total), sum(capped_capacities.values()))
+    targets = {key: 0 for key in keys}
+    if total <= 0:
+        return targets
+
+    shuffled_keys = list(keys)
+    rng.shuffle(shuffled_keys)
+    while sum(targets.values()) < total:
+        progressed = False
+        for key in shuffled_keys:
+            if sum(targets.values()) >= total:
+                break
+            if targets[key] >= capped_capacities[key]:
+                continue
+            min_target = min(targets.values())
+            if targets[key] > min_target:
+                continue
+            targets[key] += 1
+            progressed = True
+        if progressed:
+            continue
+        for key in shuffled_keys:
+            if sum(targets.values()) >= total:
+                break
+            if targets[key] < capped_capacities[key]:
+                targets[key] += 1
+                progressed = True
+        if not progressed:
+            break
+    return targets
+
+
 def prepare_nsynth_manifest(config: NSynthPrepareConfig) -> pd.DataFrame:
     split = canonical_split(config.split)
     split_root = (
@@ -307,7 +487,17 @@ def prepare_nsynth_manifest(config: NSynthPrepareConfig) -> pd.DataFrame:
         pitch_min=config.pitch_min,
         pitch_max=config.pitch_max,
     )
-    frame = balanced_sample(frame, max_per_label=config.max_per_family, seed=config.seed)
+    if config.pitch_stratified:
+        frame = pitch_stratified_sample(
+            frame,
+            max_per_label=config.max_per_family,
+            max_per_pitch=config.max_per_pitch,
+            pitch_bin_size=config.pitch_bin_size,
+            require_all_labels_per_pitch=config.pitch_require_all_families,
+            seed=config.seed,
+        )
+    else:
+        frame = balanced_sample(frame, max_per_label=config.max_per_family, seed=config.seed)
 
     config.manifest_path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(config.manifest_path, index=False)

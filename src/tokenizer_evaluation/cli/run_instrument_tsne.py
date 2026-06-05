@@ -28,13 +28,15 @@ def _format_tsne_annotation(
     model_label: str,
     total_samples: int,
     max_per_family: int | None,
+    pitch_stratified: bool,
     perplexity: float,
 ) -> str:
     max_per_family_label = "none" if max_per_family is None else str(max_per_family)
+    pitch_label = "on" if pitch_stratified else "off"
     return (
         f"Model: {model_label}\n"
         f"Samples: {total_samples} | "
-        f"max-per-family: {max_per_family_label} | "
+        f"max-per-family: {max_per_family_label} | pitch-stratified: {pitch_label} | "
         f"t-SNE perplexity: {perplexity:g}"
     )
 
@@ -98,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dtype", default=None, choices=["auto", "float16", "float32"])
     parser.add_argument("--batch-size", default=None, type=int)
     parser.add_argument("--max-per-family", default=None, type=int)
+    parser.add_argument("--pitch-stratified", action="store_true")
+    parser.add_argument("--no-pitch-stratified", action="store_true")
+    parser.add_argument("--pitch-bin-size", default=None, type=int)
+    parser.add_argument("--max-per-pitch", default=None, type=int)
+    parser.add_argument("--keep-incomplete-pitch-strata", action="store_true")
     parser.add_argument("--download", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     return parser
@@ -118,6 +125,11 @@ def main() -> None:
     manifest_path = args.manifest or Path(dataset_cfg.get("manifest", "outputs/nsynth_manifest.csv"))
     output_dir = args.output_dir or Path(output_cfg.get("dir", "outputs/nsynth_instrument"))
     output_dir.mkdir(parents=True, exist_ok=True)
+    pitch_stratified = bool(dataset_cfg.get("pitch_stratified", False))
+    if args.pitch_stratified:
+        pitch_stratified = True
+    if args.no_pitch_stratified:
+        pitch_stratified = False
 
     prepare_cfg = NSynthPrepareConfig(
         nsynth_root=args.nsynth_root,
@@ -130,6 +142,15 @@ def main() -> None:
         sources=tuple(dataset_cfg.get("sources") or ()),
         pitch_min=dataset_cfg.get("pitch_min"),
         pitch_max=dataset_cfg.get("pitch_max"),
+        pitch_stratified=pitch_stratified,
+        pitch_bin_size=args.pitch_bin_size
+        if args.pitch_bin_size is not None
+        else int(dataset_cfg.get("pitch_bin_size", 1)),
+        max_per_pitch=args.max_per_pitch
+        if args.max_per_pitch is not None
+        else dataset_cfg.get("max_per_pitch"),
+        pitch_require_all_families=not args.keep_incomplete_pitch_strata
+        and bool(dataset_cfg.get("pitch_require_all_families", True)),
         seed=int(dataset_cfg.get("seed", 42)),
         download=args.download,
     )
@@ -193,6 +214,7 @@ def main() -> None:
             model_label=model_label,
             total_samples=total_samples,
             max_per_family=max_per_family,
+            pitch_stratified=prepare_cfg.pitch_stratified,
             perplexity=perplexity,
         )
         save_tsne_plot(

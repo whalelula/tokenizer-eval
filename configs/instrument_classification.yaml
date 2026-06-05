@@ -5,8 +5,15 @@ dataset:
   seed: 42
   families: []
   sources: []
-  pitch_min:
-  pitch_max:
+  # Valid split report: pitches 31-96 each cover all 10 instrument families.
+  # Pitch-stratified sampling prioritizes equal family counts within each pitch,
+  # then balanced total counts per family.
+  pitch_min: 31
+  pitch_max: 96
+  pitch_stratified: true
+  pitch_bin_size: 1
+  max_per_pitch:
+  pitch_require_all_families: true
 
 runtime:
   # Default is GPU inference. Use --device cpu on a local CPU-only machine.
