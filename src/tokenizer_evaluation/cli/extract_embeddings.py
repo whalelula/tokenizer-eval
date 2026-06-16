@@ -19,6 +19,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", default=1, type=int)
     parser.add_argument("--max-duration-seconds", default=4.0, type=float)
     parser.add_argument("--model-name", default=None)
+    parser.add_argument("--model-bitrate", default=None)
+    parser.add_argument("--tag", default=None)
     parser.add_argument("--pooling", default=None)
     parser.add_argument("--layer", default=None, type=int)
     parser.add_argument("--layers", nargs="+", default=None, type=int)
@@ -44,6 +46,10 @@ def main() -> None:
     model_config = {}
     if args.model_name is not None:
         model_config["model_name"] = args.model_name
+    if args.model_bitrate is not None:
+        model_config["model_bitrate"] = args.model_bitrate
+    if args.tag is not None:
+        model_config["tag"] = args.tag
     if args.pooling is not None:
         model_config["pooling"] = args.pooling
     if args.layer is not None:

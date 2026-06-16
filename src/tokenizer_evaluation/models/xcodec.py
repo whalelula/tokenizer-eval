@@ -15,14 +15,18 @@ from tokenizer_evaluation.models.base import (
 
 
 class XCodecExtractor(LoopingExtractor):
-    """X-Codec extractor using the Hugging Face/official model wrapper."""
+    """X-Codec extractor using the Hugging Face/official model wrapper.
+
+    The default representation is the first post-quantizer continuous codebook
+    embedding rather than pre-quantized encoder states or discrete code IDs.
+    """
 
     name = "x-codec"
 
     def __init__(
         self,
         model_name: str = "hf-audio/xcodec-hubert-general",
-        representation: str = "pre_quantized",
+        representation: str = "quantized",
         pooling: str = "mean",
         device: str = "cuda",
         dtype: str = "auto",
@@ -87,16 +91,30 @@ class XCodecExtractor(LoopingExtractor):
             codes = getattr(encoded, "audio_codes", fallback_codes)
             return codes.float()
 
-        if self.representation != "pre_quantized":
-            raise ValueError("X-Codec representation must be 'pre_quantized' or 'codes'.")
-
-        try:
+        if self.representation == "pre_quantized":
             return self._pre_quantized_features(input_values)
-        except AttributeError:
-            encoded = self.model.encode(input_values)
-            fallback_codes = encoded[0] if isinstance(encoded, tuple) else encoded
-            codes = getattr(encoded, "audio_codes", fallback_codes)
-            return codes.float()
+
+        if self.representation == "quantized":
+            return self._quantized_features(input_values)
+
+        raise ValueError(
+            "X-Codec representation must be 'quantized', 'pre_quantized', or 'codes'."
+        )
+
+    def _quantized_features(self, input_values):
+        pre_quantized = self._pre_quantized_features(input_values)
+        quantizer = getattr(self.model, "quantizer", None)
+        if quantizer is None:
+            raise RuntimeError("X-Codec model does not expose a quantizer module.")
+
+        quantized = self._decode_first_quantizer(quantizer, pre_quantized)
+        if quantized is None:
+            raise RuntimeError(
+                "Could not extract the first continuous post-quantizer layer from "
+                "this X-Codec model. Use --representation pre_quantized or "
+                "--representation codes for an explicit fallback."
+            )
+        return quantized
 
     def _pre_quantized_features(self, input_values):
         import torch.nn.functional as functional
@@ -115,4 +133,26 @@ class XCodecExtractor(LoopingExtractor):
             else:
                 acoustic = functional.pad(acoustic, (0, -diff))
 
-        return self.model.fc(self._torch.cat([acoustic, semantic], dim=1))
+        features = self._torch.cat([acoustic, semantic], dim=1)
+        try:
+            return self.model.fc(features.transpose(1, 2)).transpose(1, 2)
+        except RuntimeError:
+            return self.model.fc(features)
+
+    def _decode_first_quantizer(self, quantizer, pre_quantized):
+        quantizers = getattr(quantizer, "quantizers", None)
+        if quantizers is not None and len(quantizers) > 0:
+            first = quantizers[0]
+            if hasattr(first, "encode") and hasattr(first, "decode"):
+                codes = first.encode(pre_quantized)
+                return first.decode(codes)
+            result = first(pre_quantized)
+            return result[0] if isinstance(result, tuple) else result
+
+        if hasattr(quantizer, "encode") and hasattr(quantizer, "decode"):
+            codes = quantizer.encode(pre_quantized)
+            if codes.ndim == 3:
+                codes = codes[:1]
+            return quantizer.decode(codes)
+
+        return None

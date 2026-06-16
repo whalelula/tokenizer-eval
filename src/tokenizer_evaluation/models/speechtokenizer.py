@@ -16,7 +16,11 @@ from tokenizer_evaluation.models.base import (
 
 
 class SpeechTokenizerExtractor(LoopingExtractor):
-    """SpeechTokenizer extractor using the official load_from_checkpoint API."""
+    """SpeechTokenizer extractor using the official load_from_checkpoint API.
+
+    The default quantized representation is the first post-RVQ continuous
+    feature layer, matching the other codec-style tokenizers.
+    """
 
     name = "speechtokenizer"
 
@@ -93,8 +97,7 @@ class SpeechTokenizerExtractor(LoopingExtractor):
 
         layers = self.layers
         if layers is None:
-            n_layers = self.n_q or getattr(self.model.quantizer, "n_q", 8)
-            layers = tuple(range(int(n_layers)))
+            layers = (0,)
 
         if self.representation == "quantized":
             quantized = self.model.forward_feature(audio, layers=list(layers))

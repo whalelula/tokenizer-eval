@@ -3,6 +3,7 @@ from __future__ import annotations
 from .atst import ATSTExtractor
 from .base import EmbeddingExtractor, resolve_device
 from .beats import BEATsExtractor
+from .dac import DACExtractor
 from .hubert import HuBERTExtractor
 from .mert import MERTExtractor
 from .mucodec import MuCodecExtractor
@@ -16,6 +17,7 @@ from .xcodec import XCodecExtractor
 EXTRACTORS = {
     "atst": ATSTExtractor,
     "beats": BEATsExtractor,
+    "dac": DACExtractor,
     "hubert": HuBERTExtractor,
     "mert": MERTExtractor,
     "mucodec": MuCodecExtractor,
@@ -32,6 +34,7 @@ EXTRACTORS = {
 __all__ = [
     "ATSTExtractor",
     "BEATsExtractor",
+    "DACExtractor",
     "EmbeddingExtractor",
     "EXTRACTORS",
     "HuBERTExtractor",

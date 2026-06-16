@@ -16,6 +16,7 @@ representation model 的 clip-level latent embedding。
 - `speechtokenizer`
 - `x-codec`
 - `mucodec`
+- `dac`
 
 ## 安装建议
 
@@ -41,6 +42,7 @@ pip install -e ".[xcodec]"
 pip install -e ".[stable-audio-open]"
 pip install -e ".[music2latents]"
 pip install -e ".[speechtokenizer]"
+pip install -e ".[dac]"
 ```
 
 国内或网络不稳定时，可以加 PyPI 镜像：
@@ -49,9 +51,17 @@ pip install -e ".[speechtokenizer]"
 pip install -e ".[hubert]" -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-注意：PyPI 镜像只加速 PyPI 依赖。形如
-`git+https://github.com/Stability-AI/stable-audio-tools.git` 的 GitHub 依赖仍然需要能访问
-GitHub。GitHub 连接不稳定时，先手动 clone 官方仓库，再 `pip install -e path/to/repo`。
+注意：PyPI 镜像只加速 PyPI 依赖。`stable-audio-open` 默认安装 PyPI 上的
+`stable-audio-tools`，不需要 clone GitHub。如果你需要官方仓库的最新代码，可以先手动 clone
+再安装：
+
+```powershell
+git clone --depth 1 https://github.com/Stability-AI/stable-audio-tools.git external/stable-audio-tools
+pip install -e external/stable-audio-tools
+pip install -e ".[stable-audio-open]"
+```
+
+形如 `git+https://github.com/...` 的 GitHub 依赖仍然需要能访问 GitHub。
 
 Hugging Face 模型下载可以使用镜像和大容量缓存目录：
 
@@ -168,7 +178,7 @@ extract-tokenizer-embeddings `
 
 ```powershell
 extract-tokenizer-embeddings `
-  --manifest outputs/nsynth_valid_manifest.csv `
+  --manifest outputs/nsynth_test_manifest.csv `
   --model stable-audio-open-vae `
   --model-name stabilityai/stable-audio-open-1.0 `
   --pooling mean `
@@ -232,7 +242,8 @@ extract-tokenizer-embeddings `
 
 默认表示：
 
-- `--representation quantized`: 使用 `forward_feature` 的连续 RVQ embedding
+- `--representation quantized`: 默认使用 `forward_feature` 的第一层连续 RVQ embedding
+  (`--layers 0`)，也就是 quantization 后的第一个连续层
 - `--representation semantic`: 使用 semantic token 层输出
 - `--representation codes`: 使用离散 code IDs 转 float 后 pooling
 
@@ -243,7 +254,6 @@ extract-tokenizer-embeddings `
   --manifest outputs/nsynth_valid_manifest.csv `
   --model speechtokenizer `
   --representation quantized `
-  --layers 0 1 2 3 4 5 6 7 `
   --pooling mean `
   --output outputs/speechtokenizer/embeddings.npz
 ```
@@ -262,9 +272,10 @@ extract-tokenizer-embeddings `
 
 ## X-Codec
 
-官方模型 wrapper 已集成在 Hugging Face Transformers 的 `XcodecModel`。默认优先抽
-quantizer 之前的连续 latent；如果当前 Transformers 或模型结构不支持，会 fallback 到
-public `encode` 返回的 code IDs。
+官方模型 wrapper 已集成在 Hugging Face Transformers 的 `XcodecModel`。默认表示是
+`--representation quantized`：先得到进入 quantizer 的连续 latent，再只取第一个
+codebook/quantizer 解码后的连续 embedding。`pre_quantized` 和 `codes` 仍然保留，
+但需要显式指定。
 
 示例：
 
@@ -273,15 +284,21 @@ extract-tokenizer-embeddings `
   --manifest outputs/nsynth_valid_manifest.csv `
   --model x-codec `
   --model-name hf-audio/xcodec-hubert-general `
-  --representation pre_quantized `
+  --representation quantized `
   --pooling mean `
   --output outputs/xcodec/embeddings.npz
 ```
 
 ## MuCodec
 
-官方代码：`tencent-ailab/MuCodec`。项目使用官方 `generate.MuCodec.sound2code` 抽取
-token codes，再做 pooling。MuCodec 官方脚本主要面向 CUDA，CPU 路线可能需要额外适配。
+官方代码：`tencent-ailab/MuCodec`。项目使用官方 `generate.MuCodec` 加载模型，
+但不会走 `sound2code` 的离散 code 输出；而是读取 `fetch_codes_batch` 返回的
+MuEncoder 连续 latent，再通过 `rvq_muencoder_emb` 的第一个 quantizer，取
+quantization 后的第一个连续层做 pooling。
+
+`--layer-num` 沿用官方 helper 的语义：传入的层号会由官方 `MuCodec` wrapper 内部转换成
+0-based encoder layer index，用来决定送入 quantizer 的 MuEncoder 层。默认是 `7`，
+作为声学细节和高层语义之间的折中。
 
 示例：
 
@@ -293,7 +310,29 @@ extract-tokenizer-embeddings `
   --model mucodec `
   --repo-path external/MuCodec `
   --checkpoint-path checkpoints/mucodec.pt `
-  --layer-num 1 `
+  --layer-num 7 `
   --pooling mean `
   --output outputs/mucodec/embeddings.npz
+```
+
+## DAC
+
+官方代码：`descriptinc/descript-audio-codec`。项目使用官方 `dac.DAC` 模型加载和
+`model.encode(..., n_quantizers=1)`，默认取第一个 RVQ/codebook 量化后的连续表示
+`z`，不使用 quantizer 之前的 `latents`，也不把离散 `codes` 当 embedding。
+
+默认会下载官方 `44khz` / `8kbps` 权重；也可以用 `--model-name 24khz`、
+`--model-name 16khz`，或通过 `--checkpoint-path` 指定本地权重。44.1kHz 的 16kbps
+模型可以传 `--model-bitrate 16kbps`。
+
+示例：
+
+```powershell
+extract-tokenizer-embeddings `
+  --manifest outputs/nsynth_valid_manifest.csv `
+  --model dac `
+  --model-name 44khz `
+  --representation quantized `
+  --pooling mean `
+  --output outputs/dac/embeddings.npz
 ```

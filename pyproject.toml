@@ -26,7 +26,7 @@ same = [
     "stable-audio-3 @ git+https://github.com/Stability-AI/stable-audio-3.git",
 ]
 stable-audio-open = [
-    "stable-audio-tools @ git+https://github.com/Stability-AI/stable-audio-tools.git",
+    "stable-audio-tools>=0.0.19",
 ]
 music2latents = [
     "music2latent @ git+https://github.com/SonyCSLParis/music2latent.git",
@@ -37,9 +37,13 @@ speechtokenizer = [
 xcodec = [
     "transformers>=4.56",
 ]
+dac = [
+    "descript-audio-codec>=1.0.0",
+]
 extractors = [
     "transformers>=4.56",
     "huggingface_hub>=0.23",
+    "descript-audio-codec>=1.0.0",
 ]
 viz = [
     "matplotlib>=3.8",

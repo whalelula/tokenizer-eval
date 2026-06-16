@@ -24,6 +24,7 @@ tokenizer 选项：
 - `speechtokenizer`: SpeechTokenizer
 - `x-codec`: X-Codec
 - `mucodec`: MuCodec
+- `dac`: DAC
 
 当前命令比较的是已保存 latent bundle，因此 tokenizer 选项用于记录和校验实验设置。
 如果某个 tokenizer 还没有本项目内置抽取器，可以先用外部脚本生成兼容的 `.npz`
@@ -109,4 +110,3 @@ outputs/pairwise_structure/<dataset>/<tokenizer-a>_vs_<tokenizer-b>/
 - `pairwise_similarity_structure_summary.csv`: 单行宽表，包含 `SSS_global` 和各个 `SSS_local@k`。
 - `pairwise_similarity_structure_long.csv`: 长表，方便后续画图或统计。
 - `pairwise_similarity_structure_metadata.csv`: 实际参与比较的对齐后 metadata。
-

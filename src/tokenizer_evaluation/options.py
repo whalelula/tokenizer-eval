@@ -32,6 +32,7 @@ SUPPORTED_TOKENIZERS: tuple[NamedOption, ...] = (
     NamedOption("speechtokenizer", "SpeechTokenizer", aliases=("speech-tokenizer",)),
     NamedOption("x-codec", "X-Codec", aliases=("xcodec",)),
     NamedOption("mucodec", "MuCodec", aliases=("mu-codec",)),
+    NamedOption("dac", "DAC", aliases=("descript-audio-codec",)),
 )
 
 
