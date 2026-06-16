@@ -56,6 +56,8 @@ dev = [
 
 [project.scripts]
 prepare-nsynth = "tokenizer_evaluation.cli.prepare_nsynth:main"
+prepare-medley-solos-db = "tokenizer_evaluation.cli.prepare_medley_solos_db:main"
+prepare-mtg-jamendo = "tokenizer_evaluation.cli.prepare_mtg_jamendo:main"
 extract-tokenizer-embeddings = "tokenizer_evaluation.cli.extract_embeddings:main"
 run-instrument-tsne = "tokenizer_evaluation.cli.run_instrument_tsne:main"
 run-knn-purity = "tokenizer_evaluation.cli.run_knn_purity:main"

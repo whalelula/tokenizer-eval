@@ -109,3 +109,4 @@ outputs/pairwise_structure/<dataset>/<tokenizer-a>_vs_<tokenizer-b>/
 - `pairwise_similarity_structure_summary.csv`: 单行宽表，包含 `SSS_global` 和各个 `SSS_local@k`。
 - `pairwise_similarity_structure_long.csv`: 长表，方便后续画图或统计。
 - `pairwise_similarity_structure_metadata.csv`: 实际参与比较的对齐后 metadata。
+
