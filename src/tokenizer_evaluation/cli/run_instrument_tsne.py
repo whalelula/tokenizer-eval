@@ -11,6 +11,7 @@ from tokenizer_evaluation.config import load_yaml_config
 from tokenizer_evaluation.datasets.nsynth import NSynthPrepareConfig, prepare_nsynth_manifest
 from tokenizer_evaluation.embeddings import build_extractor, extract_embeddings
 from tokenizer_evaluation.metrics import compute_embedding_metrics, save_metrics
+from tokenizer_evaluation.models import EXTRACTORS
 from tokenizer_evaluation.reduction import run_tsne
 from tokenizer_evaluation.visualization import save_comparison_plot, save_tsne_plot
 
@@ -86,13 +87,17 @@ def _default_comparison_filename(run_specs: list[tuple[str, str, str, dict[str, 
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run SAME/MERT NSynth instrument t-SNE evaluation.")
-    parser.add_argument("--config", default=Path("configs/instrument_classification.yaml"), type=Path)
+    parser = argparse.ArgumentParser(description="Run NSynth instrument t-SNE evaluation.")
+    parser.add_argument(
+        "--config",
+        default=Path("configs/instrument_classification.yaml"),
+        type=Path,
+    )
     parser.add_argument("--nsynth-root", required=True, type=Path)
     parser.add_argument("--split", default=None, choices=["train", "valid", "validation", "test"])
     parser.add_argument("--manifest", default=None, type=Path)
     parser.add_argument("--output-dir", default=None, type=Path)
-    parser.add_argument("--models", nargs="+", default=None, choices=["same", "mert"])
+    parser.add_argument("--models", nargs="+", default=None, choices=sorted(EXTRACTORS))
     parser.add_argument("--mert-layers", nargs="+", default=None, type=int)
     parser.add_argument("--same-models", nargs="+", default=None)
     parser.add_argument("--comparison-name", default=None)
@@ -122,7 +127,9 @@ def main() -> None:
     output_cfg: dict[str, Any] = config.get("output", {})
 
     split = args.split or dataset_cfg.get("split", "valid")
-    manifest_path = args.manifest or Path(dataset_cfg.get("manifest", "outputs/nsynth_manifest.csv"))
+    manifest_path = args.manifest or Path(
+        dataset_cfg.get("manifest", "outputs/nsynth_manifest.csv")
+    )
     output_dir = args.output_dir or Path(output_cfg.get("dir", "outputs/nsynth_instrument"))
     output_dir.mkdir(parents=True, exist_ok=True)
     pitch_stratified = bool(dataset_cfg.get("pitch_stratified", False))

@@ -1,0 +1,7 @@
+{
+  "model": "mert",
+  "num_items": 2000,
+  "embedding_dim": 1024,
+  "embedding_file": "outputs/nsynth_instrument_pitch_stratified_p30/mert_layer_24/embeddings.npz",
+  "metadata_file": "outputs/nsynth_instrument_pitch_stratified_p30/mert_layer_24/embeddings.metadata.csv"
+}

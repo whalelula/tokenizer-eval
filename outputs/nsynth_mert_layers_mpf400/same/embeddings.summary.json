@@ -1,0 +1,7 @@
+{
+  "model": "same",
+  "num_items": 2933,
+  "embedding_dim": 256,
+  "embedding_file": "outputs/nsynth_mert_layers_mpf400/same/embeddings.npz",
+  "metadata_file": "outputs/nsynth_mert_layers_mpf400/same/embeddings.metadata.csv"
+}

@@ -1,0 +1,7 @@
+{
+  "model": "same",
+  "num_items": 2000,
+  "embedding_dim": 256,
+  "embedding_file": "outputs/nsynth_instrument_pitch_stratified/same_same_s/embeddings.npz",
+  "metadata_file": "outputs/nsynth_instrument_pitch_stratified/same_same_s/embeddings.metadata.csv"
+}

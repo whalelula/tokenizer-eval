@@ -1,0 +1,7 @@
+{
+  "model": "same",
+  "num_items": 1921,
+  "embedding_dim": 256,
+  "embedding_file": "outputs/nsynth_instrument/same/embeddings.npz",
+  "metadata_file": "outputs/nsynth_instrument/same/embeddings.metadata.csv"
+}

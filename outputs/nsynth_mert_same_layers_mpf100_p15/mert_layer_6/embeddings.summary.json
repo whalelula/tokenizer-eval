@@ -1,0 +1,7 @@
+{
+  "model": "mert",
+  "num_items": 1000,
+  "embedding_dim": 1024,
+  "embedding_file": "outputs/nsynth_mert_same_layers_mpf100_p15/mert_layer_6/embeddings.npz",
+  "metadata_file": "outputs/nsynth_mert_same_layers_mpf100_p15/mert_layer_6/embeddings.metadata.csv"
+}

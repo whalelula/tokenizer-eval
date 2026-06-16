@@ -146,6 +146,89 @@ def compute_knn_purity(
     }
 
 
+def compute_pairwise_similarity_structure(
+    embeddings_a: np.ndarray,
+    embeddings_b: np.ndarray,
+    local_ks: Sequence[int] = (5, 10, 30, 50),
+    clip_pooling: str = "mean",
+    clip_pool_axis: int = 1,
+) -> dict[str, Any]:
+    """Compare pairwise cosine-similarity structure between two latent spaces.
+
+    Global structure is Spearman rank correlation over all unique non-diagonal
+    sample pairs. Local structure is mean top-k neighbor overlap per sample.
+    The two embedding spaces may have different feature dimensions, but their
+    first dimension must describe the same samples in the same order.
+    """
+
+    features_a = _pool_clip_level_embeddings(
+        embeddings_a,
+        pooling=clip_pooling,
+        pool_axis=clip_pool_axis,
+    )
+    features_b = _pool_clip_level_embeddings(
+        embeddings_b,
+        pooling=clip_pooling,
+        pool_axis=clip_pool_axis,
+    )
+    if len(features_a) != len(features_b):
+        raise ValueError(
+            "Embedding counts must match after alignment: "
+            f"A has {len(features_a)} rows, B has {len(features_b)} rows."
+        )
+
+    n_items = len(features_a)
+    if n_items < 2:
+        raise ValueError("Pairwise similarity structure needs at least two items.")
+
+    clean_ks = sorted({int(k) for k in local_ks})
+    if not clean_ks or any(k <= 0 for k in clean_ks):
+        raise ValueError("local_ks must contain at least one positive integer.")
+    max_k = max(clean_ks)
+    if max_k >= n_items:
+        raise ValueError(
+            f"Cannot compute local overlap@{max_k} with {n_items} items; "
+            "k must be <= n_items - 1."
+        )
+
+    normalized_a = _l2_normalize_rows(features_a, "A")
+    normalized_b = _l2_normalize_rows(features_b, "B")
+    similarity_a = normalized_a @ normalized_a.T
+    similarity_b = normalized_b @ normalized_b.T
+
+    pairwise_a = _upper_triangle_pair_vector(similarity_a)
+    pairwise_b = _upper_triangle_pair_vector(similarity_b)
+    global_rank_correlation = _spearman_rank_correlation(pairwise_a, pairwise_b)
+
+    neighbors_a = _top_k_neighbors_from_similarity(similarity_a, max_k=max_k)
+    neighbors_b = _top_k_neighbors_from_similarity(similarity_b, max_k=max_k)
+
+    local_by_k: dict[str, dict[str, float | int]] = {}
+    for k in clean_ks:
+        overlaps = _neighbor_overlap_per_item(neighbors_a[:, :k], neighbors_b[:, :k])
+        local_by_k[str(k)] = {
+            "k": int(k),
+            "overlap": float(overlaps.mean()),
+            "std": float(overlaps.std()),
+            "min": float(overlaps.min()),
+            "max": float(overlaps.max()),
+        }
+
+    return {
+        "num_items": int(n_items),
+        "num_pairs": int(len(pairwise_a)),
+        "embedding_dim_a": int(features_a.shape[1]),
+        "embedding_dim_b": int(features_b.shape[1]),
+        "normalization": "l2",
+        "clip_pooling": clip_pooling,
+        "clip_pool_axis": int(clip_pool_axis),
+        "global": {
+            "rank_correlation": global_rank_correlation,
+        },
+        "local": local_by_k,
+    }
+
+
 def _pool_clip_level_embeddings(
     embeddings: np.ndarray,
     pooling: str = "mean",
@@ -220,6 +303,77 @@ def _drop_self_neighbors(indices: np.ndarray, max_k: int) -> np.ndarray:
 def _random_purity_baseline(labels: np.ndarray) -> float:
     _, inverse, counts = np.unique(labels, return_inverse=True, return_counts=True)
     return float(((counts[inverse] - 1) / (len(labels) - 1)).mean())
+
+
+def _l2_normalize_rows(features: np.ndarray, name: str) -> np.ndarray:
+    values = np.asarray(features, dtype="float32")
+    norms = np.linalg.norm(values, axis=1, keepdims=True)
+    zero_rows = np.flatnonzero(norms[:, 0] == 0)
+    if len(zero_rows):
+        preview = ", ".join(str(int(index)) for index in zero_rows[:5])
+        raise ValueError(
+            f"Embedding set {name} contains {len(zero_rows)} zero-vector rows after pooling "
+            f"(first indices: {preview}); cosine normalization is undefined."
+        )
+    return values / norms
+
+
+def _upper_triangle_pair_vector(similarity: np.ndarray) -> np.ndarray:
+    row_idx, col_idx = np.triu_indices(similarity.shape[0], k=1)
+    return np.asarray(similarity[row_idx, col_idx], dtype="float64")
+
+
+def _spearman_rank_correlation(values_a: np.ndarray, values_b: np.ndarray) -> float | None:
+    ranks_a = _average_ranks(values_a)
+    ranks_b = _average_ranks(values_b)
+    return _pearson_correlation(ranks_a, ranks_b)
+
+
+def _average_ranks(values: np.ndarray) -> np.ndarray:
+    values = np.asarray(values)
+    order = np.argsort(values, kind="mergesort")
+    sorted_values = values[order]
+    ranks = np.empty(len(values), dtype="float64")
+
+    start = 0
+    while start < len(values):
+        end = start + 1
+        while end < len(values) and sorted_values[end] == sorted_values[start]:
+            end += 1
+        # Ranks are one-based. Ties receive the average of their occupied ranks.
+        rank = (start + 1 + end) / 2.0
+        ranks[order[start:end]] = rank
+        start = end
+
+    return ranks
+
+
+def _pearson_correlation(values_a: np.ndarray, values_b: np.ndarray) -> float | None:
+    centered_a = values_a - values_a.mean()
+    centered_b = values_b - values_b.mean()
+    denominator = np.linalg.norm(centered_a) * np.linalg.norm(centered_b)
+    if denominator == 0:
+        return None
+    return float(np.dot(centered_a, centered_b) / denominator)
+
+
+def _top_k_neighbors_from_similarity(similarity: np.ndarray, max_k: int) -> np.ndarray:
+    scores = np.array(similarity, copy=True)
+    np.fill_diagonal(scores, -np.inf)
+    return np.argsort(-scores, axis=1, kind="mergesort")[:, :max_k]
+
+
+def _neighbor_overlap_per_item(neighbors_a: np.ndarray, neighbors_b: np.ndarray) -> np.ndarray:
+    if neighbors_a.shape != neighbors_b.shape:
+        raise ValueError(
+            "Neighbor arrays must have the same shape, got "
+            f"{neighbors_a.shape} and {neighbors_b.shape}."
+        )
+    k = neighbors_a.shape[1]
+    overlaps = np.empty(neighbors_a.shape[0], dtype="float64")
+    for row_index, (row_a, row_b) in enumerate(zip(neighbors_a, neighbors_b)):
+        overlaps[row_index] = len(set(row_a).intersection(row_b)) / k
+    return overlaps
 
 
 def _normalize_axis(axis: int, ndim: int) -> int:

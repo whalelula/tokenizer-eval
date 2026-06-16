@@ -19,8 +19,27 @@ dependencies = [
 mert = [
     "transformers>=4.40",
 ]
+hubert = [
+    "transformers>=4.40",
+]
 same = [
     "stable-audio-3 @ git+https://github.com/Stability-AI/stable-audio-3.git",
+]
+stable-audio-open = [
+    "stable-audio-tools @ git+https://github.com/Stability-AI/stable-audio-tools.git",
+]
+music2latents = [
+    "music2latent @ git+https://github.com/SonyCSLParis/music2latent.git",
+]
+speechtokenizer = [
+    "huggingface_hub>=0.23",
+]
+xcodec = [
+    "transformers>=4.56",
+]
+extractors = [
+    "transformers>=4.56",
+    "huggingface_hub>=0.23",
 ]
 viz = [
     "matplotlib>=3.8",
@@ -40,6 +59,7 @@ prepare-nsynth = "tokenizer_evaluation.cli.prepare_nsynth:main"
 extract-tokenizer-embeddings = "tokenizer_evaluation.cli.extract_embeddings:main"
 run-instrument-tsne = "tokenizer_evaluation.cli.run_instrument_tsne:main"
 run-knn-purity = "tokenizer_evaluation.cli.run_knn_purity:main"
+run-pairwise-structure = "tokenizer_evaluation.cli.run_pairwise_structure:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
