@@ -31,6 +31,16 @@ SUPPORTED_TOKENIZERS: tuple[NamedOption, ...] = (
     NamedOption("wavcube", "WavCube"),
     NamedOption("speechtokenizer", "SpeechTokenizer", aliases=("speech-tokenizer",)),
     NamedOption("x-codec", "X-Codec", aliases=("xcodec",)),
+    NamedOption(
+        "x-codec-ssl-latent",
+        "X-Codec SSL encoder latent",
+        aliases=("xcodec-ssl-latent", "x-codec-ssl", "xcodec-ssl"),
+    ),
+    NamedOption(
+        "x-codec-vae-latent",
+        "X-Codec VAE encoder latent",
+        aliases=("xcodec-vae-latent", "x-codec-vae", "xcodec-vae"),
+    ),
     NamedOption("mucodec", "MuCodec", aliases=("mu-codec",)),
     NamedOption("dac", "DAC", aliases=("descript-audio-codec",)),
 )

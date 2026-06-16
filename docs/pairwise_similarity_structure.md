@@ -23,6 +23,8 @@ tokenizer 选项：
 - `wavcube`: WavCube
 - `speechtokenizer`: SpeechTokenizer
 - `x-codec`: X-Codec
+- `x-codec-ssl-latent`: X-Codec SSL encoder latent before quantization
+- `x-codec-vae-latent`: X-Codec VAE encoder latent before quantization
 - `mucodec`: MuCodec
 - `dac`: DAC
 

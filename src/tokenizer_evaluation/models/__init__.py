@@ -12,7 +12,7 @@ from .same import SAMEExtractor
 from .speechtokenizer import SpeechTokenizerExtractor
 from .stable_audio_open import StableAudioOpenVAEExtractor
 from .wavcube import WavCubeExtractor
-from .xcodec import XCodecExtractor
+from .xcodec import XCodecExtractor, XCodecSSLLatentExtractor, XCodecVAELatentExtractor
 
 EXTRACTORS = {
     "atst": ATSTExtractor,
@@ -29,6 +29,14 @@ EXTRACTORS = {
     "wavcube": WavCubeExtractor,
     "x-codec": XCodecExtractor,
     "xcodec": XCodecExtractor,
+    "x-codec-ssl-latent": XCodecSSLLatentExtractor,
+    "xcodec-ssl-latent": XCodecSSLLatentExtractor,
+    "x-codec-ssl": XCodecSSLLatentExtractor,
+    "xcodec-ssl": XCodecSSLLatentExtractor,
+    "x-codec-vae-latent": XCodecVAELatentExtractor,
+    "xcodec-vae-latent": XCodecVAELatentExtractor,
+    "x-codec-vae": XCodecVAELatentExtractor,
+    "xcodec-vae": XCodecVAELatentExtractor,
 }
 
 __all__ = [
@@ -46,5 +54,7 @@ __all__ = [
     "StableAudioOpenVAEExtractor",
     "WavCubeExtractor",
     "XCodecExtractor",
+    "XCodecSSLLatentExtractor",
+    "XCodecVAELatentExtractor",
     "resolve_device",
 ]

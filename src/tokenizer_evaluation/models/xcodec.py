@@ -19,6 +19,8 @@ class XCodecExtractor(LoopingExtractor):
 
     The default representation is the first post-quantizer continuous codebook
     embedding rather than pre-quantized encoder states or discrete code IDs.
+    SSL and VAE branch latents are also exposed for representation evaluation
+    before the two branches are projected into the shared quantizer input.
     """
 
     name = "x-codec"
@@ -94,11 +96,18 @@ class XCodecExtractor(LoopingExtractor):
         if self.representation == "pre_quantized":
             return self._pre_quantized_features(input_values)
 
+        if self.representation == "ssl_latent":
+            return self._ssl_encoder_last_hidden_state(input_values)
+
+        if self.representation == "vae_latent":
+            return self._vae_encoder_last_hidden_state(input_values)
+
         if self.representation == "quantized":
             return self._quantized_features(input_values)
 
         raise ValueError(
-            "X-Codec representation must be 'quantized', 'pre_quantized', or 'codes'."
+            "X-Codec representation must be 'quantized', 'pre_quantized', "
+            "'ssl_latent', 'vae_latent', or 'codes'."
         )
 
     def _quantized_features(self, input_values):
@@ -119,8 +128,7 @@ class XCodecExtractor(LoopingExtractor):
     def _pre_quantized_features(self, input_values):
         import torch.nn.functional as functional
 
-        if input_values.ndim == 2:
-            input_values = input_values.unsqueeze(1)
+        input_values = self._ensure_channel_axis(input_values)
 
         semantic_input = self.model._extract_semantic_features(input_values).detach()
         semantic = self.model.encoder_semantic(semantic_input.transpose(1, 2))
@@ -139,6 +147,44 @@ class XCodecExtractor(LoopingExtractor):
         except RuntimeError:
             return self.model.fc(features)
 
+    def _ssl_encoder_last_hidden_state(self, input_values):
+        import torch.nn.functional as functional
+
+        input_values = self._ensure_channel_axis(input_values)
+        semantic_input = input_values[:, 0, :]
+        pad = int(getattr(self.model, "pad", 0))
+        if pad:
+            semantic_input = functional.pad(semantic_input, (pad, pad))
+
+        semantic_outputs = self.model.semantic_model(
+            semantic_input,
+            output_hidden_states=True,
+        )
+        hidden_states = getattr(semantic_outputs, "hidden_states", None)
+        if hidden_states:
+            last_hidden_state = hidden_states[-1]
+        else:
+            last_hidden_state = getattr(semantic_outputs, "last_hidden_state", None)
+        if last_hidden_state is None:
+            raise RuntimeError("X-Codec semantic_model did not return hidden states.")
+        if last_hidden_state.ndim != 3:
+            raise RuntimeError(
+                "Expected X-Codec SSL latent with shape [batch, time, channels], "
+                f"got {last_hidden_state.shape}."
+            )
+        return last_hidden_state.transpose(1, 2).float()
+
+    def _vae_encoder_last_hidden_state(self, input_values):
+        input_values = self._ensure_channel_axis(input_values)
+        return self.model.acoustic_encoder(input_values).float()
+
+    def _ensure_channel_axis(self, input_values):
+        if input_values.ndim == 2:
+            return input_values.unsqueeze(1)
+        if input_values.ndim != 3:
+            raise ValueError(f"Expected X-Codec input with 2 or 3 dims, got {input_values.shape}.")
+        return input_values
+
     def _decode_first_quantizer(self, quantizer, pre_quantized):
         quantizers = getattr(quantizer, "quantizers", None)
         if quantizers is not None and len(quantizers) > 0:
@@ -156,3 +202,21 @@ class XCodecExtractor(LoopingExtractor):
             return quantizer.decode(codes)
 
         return None
+
+
+class XCodecSSLLatentExtractor(XCodecExtractor):
+    """X-Codec SSL encoder last-layer latent before quantization."""
+
+    name = "x-codec-ssl-latent"
+
+    def __init__(self, *args, representation: str = "ssl_latent", **kwargs) -> None:
+        super().__init__(*args, representation=representation, **kwargs)
+
+
+class XCodecVAELatentExtractor(XCodecExtractor):
+    """X-Codec VAE/acoustic encoder last-layer latent before quantization."""
+
+    name = "x-codec-vae-latent"
+
+    def __init__(self, *args, representation: str = "vae_latent", **kwargs) -> None:
+        super().__init__(*args, representation=representation, **kwargs)

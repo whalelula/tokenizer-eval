@@ -15,6 +15,8 @@ representation model 的 clip-level latent embedding。
 - `wavcube`
 - `speechtokenizer`
 - `x-codec`
+- `x-codec-ssl-latent`
+- `x-codec-vae-latent`
 - `mucodec`
 - `dac`
 
@@ -277,6 +279,13 @@ extract-tokenizer-embeddings `
 codebook/quantizer 解码后的连续 embedding。`pre_quantized` 和 `codes` 仍然保留，
 但需要显式指定。
 
+另有两个用于分析 quantization 之前分支 latent 的独立 tokenizer 名称：
+
+- `x-codec-ssl-latent`: 取 SSL/semantic encoder 的最后一层 hidden state
+  (`semantic_model(...).hidden_states[-1]`)
+- `x-codec-vae-latent`: 取 VAE/acoustic encoder 的最后一层 latent
+  (`acoustic_encoder(...)`)
+
 示例：
 
 ```powershell
@@ -287,6 +296,28 @@ extract-tokenizer-embeddings `
   --representation quantized `
   --pooling mean `
   --output outputs/xcodec/embeddings.npz
+```
+
+SSL encoder 最后一层 latent：
+
+```powershell
+extract-tokenizer-embeddings `
+  --manifest outputs/nsynth_valid_manifest.csv `
+  --model x-codec-ssl-latent `
+  --model-name hf-audio/xcodec-hubert-general `
+  --pooling mean `
+  --output outputs/xcodec_ssl_latent/embeddings.npz
+```
+
+VAE encoder 最后一层 latent：
+
+```powershell
+extract-tokenizer-embeddings `
+  --manifest outputs/nsynth_valid_manifest.csv `
+  --model x-codec-vae-latent `
+  --model-name hf-audio/xcodec-hubert-general `
+  --pooling mean `
+  --output outputs/xcodec_vae_latent/embeddings.npz
 ```
 
 ## MuCodec
