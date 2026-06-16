@@ -1,0 +1,8 @@
+{
+  "num_items": 1921,
+  "num_classes": 10,
+  "label_col": "instrument_family_str",
+  "silhouette": -0.02308093197643757,
+  "knn_accuracy": 0.6237006237006237,
+  "knn_macro_f1": 0.6232571939876591
+}
