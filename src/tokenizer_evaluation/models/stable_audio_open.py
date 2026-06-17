@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,7 @@ class StableAudioOpenVAEExtractor(LoopingExtractor):
         max_duration_seconds: float | None = 4.0,
         sample_rate: int | None = None,
         channels: int | None = None,
+        use_vae_checkpoint: bool = True,
         **encode_kwargs: Any,
     ) -> None:
         import torch
@@ -55,7 +57,13 @@ class StableAudioOpenVAEExtractor(LoopingExtractor):
         self.encode_kwargs = encode_kwargs
         self._torch = torch
 
-        model, model_config = get_pretrained_model(model_name)
+        if use_vae_checkpoint:
+            try:
+                model, model_config = self._load_vae_checkpoint(model_name)
+            except self._vae_checkpoint_missing_errors():
+                model, model_config = get_pretrained_model(model_name)
+        else:
+            model, model_config = get_pretrained_model(model_name)
         self.model_config = model_config
         self.model = model
         if hasattr(self.model, "eval"):
@@ -66,7 +74,11 @@ class StableAudioOpenVAEExtractor(LoopingExtractor):
         self.sample_rate = int(
             sample_rate or self._config_value(model_config, "sample_rate", 44100)
         )
-        self.channels = int(channels or self._config_value(model_config, "io_channels", 2))
+        self.channels = int(
+            channels
+            or self._config_value(model_config, "audio_channels", 0)
+            or self._config_value(model_config, "io_channels", 2)
+        )
 
     def extract_one(self, audio_path: str | Path) -> np.ndarray:
         waveform, _ = load_audio(
@@ -109,6 +121,33 @@ class StableAudioOpenVAEExtractor(LoopingExtractor):
         raise ValueError(
             "Could not find an encode-capable VAE/pretransform on the stable-audio-tools model."
         )
+
+    def _load_vae_checkpoint(self, model_name: str):
+        """Load Stable Audio Open's VAE-only checkpoint instead of the full diffusion model."""
+        from huggingface_hub import hf_hub_download
+        from stable_audio_tools.models.factory import create_model_from_config
+        from stable_audio_tools.models.utils import load_ckpt_state_dict
+
+        config_path = hf_hub_download(
+            model_name,
+            filename="vae_model_config.json",
+            repo_type="model",
+        )
+        checkpoint_path = hf_hub_download(
+            model_name,
+            filename="vae_model.ckpt",
+            repo_type="model",
+        )
+        with Path(config_path).open("r", encoding="utf-8") as handle:
+            model_config = json.load(handle)
+        model = create_model_from_config(model_config)
+        model.load_state_dict(load_ckpt_state_dict(checkpoint_path), strict=False)
+        return model, model_config
+
+    def _vae_checkpoint_missing_errors(self):
+        from huggingface_hub.errors import EntryNotFoundError, LocalEntryNotFoundError
+
+        return (EntryNotFoundError, LocalEntryNotFoundError)
 
     def _config_value(self, config: dict[str, Any], key: str, default: int) -> int:
         if key in config:

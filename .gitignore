@@ -1,5 +1,7 @@
 data/
 outputs/
+checkpoints/
+ckpts/
 
 __pycache__/
 *.py[cod]
