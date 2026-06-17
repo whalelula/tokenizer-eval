@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 from typing import Iterable
 
@@ -40,8 +41,7 @@ def extract_embeddings(
     metadata_path = output_npz.with_suffix(".metadata.csv")
 
     if output_npz.exists() and metadata_path.exists() and not overwrite:
-        loaded = np.load(output_npz)
-        return loaded["embeddings"], pd.read_csv(metadata_path)
+        return _load_embeddings_array(output_npz), pd.read_csv(metadata_path)
 
     output_npz.parent.mkdir(parents=True, exist_ok=True)
     frame = manifest.reset_index(drop=True).copy()
@@ -52,7 +52,10 @@ def extract_embeddings(
         vectors.append(extractor.extract_batch(batch))
 
     embeddings = np.concatenate(vectors, axis=0).astype("float32")
-    np.savez_compressed(output_npz, embeddings=embeddings)
+    temp_npz = output_npz.with_name(f"{output_npz.name}.tmp")
+    with temp_npz.open("wb") as handle:
+        np.savez_compressed(handle, embeddings=embeddings)
+    temp_npz.replace(output_npz)
     frame.to_csv(metadata_path, index=False)
 
     summary = {
@@ -71,9 +74,24 @@ def extract_embeddings(
 
 def load_embedding_bundle(npz_path: str | Path) -> tuple[np.ndarray, pd.DataFrame]:
     npz_path = Path(npz_path)
-    embeddings = np.load(npz_path)["embeddings"]
+    embeddings = _load_embeddings_array(npz_path)
     metadata = pd.read_csv(npz_path.with_suffix(".metadata.csv"))
     return embeddings, metadata
+
+
+def _load_embeddings_array(npz_path: Path) -> np.ndarray:
+    try:
+        with np.load(npz_path) as loaded:
+            return loaded["embeddings"]
+    except (OSError, zipfile.BadZipFile, ValueError) as exc:
+        raise ValueError(
+            f"Could not read embedding archive '{npz_path}'. The file may be incomplete "
+            "or corrupted; regenerate it with extract-tokenizer-embeddings --overwrite."
+        ) from exc
+    except KeyError as exc:
+        raise ValueError(
+            f"Embedding archive '{npz_path}' does not contain an 'embeddings' array."
+        ) from exc
 
 
 def _batches(items: list[str], batch_size: int) -> Iterable[list[str]]:

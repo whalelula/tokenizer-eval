@@ -15,6 +15,8 @@ representation model 的 clip-level latent embedding。
 - `wavcube`
 - `speechtokenizer`
 - `x-codec`
+- `x-codec-pre-quantized`
+- `x-codec-post-quantized`
 - `x-codec-ssl-latent`
 - `x-codec-vae-latent`
 - `mucodec`
@@ -296,6 +298,28 @@ extract-tokenizer-embeddings `
   --representation quantized `
   --pooling mean `
   --output outputs/xcodec/embeddings.npz
+```
+
+semantic 和 acoustic 分支 concat 融合后、quantization 前的连续 latent：
+
+```powershell
+extract-tokenizer-embeddings `
+  --manifest outputs/nsynth_valid_manifest.csv `
+  --model x-codec-pre-quantized `
+  --model-name hf-audio/xcodec-hubert-general `
+  --pooling mean `
+  --output outputs/xcodec_pre_quantized/embeddings.npz
+```
+
+quantization 后第一个连续 latent：
+
+```powershell
+extract-tokenizer-embeddings `
+  --manifest outputs/nsynth_valid_manifest.csv `
+  --model x-codec-post-quantized `
+  --model-name hf-audio/xcodec-hubert-general `
+  --pooling mean `
+  --output outputs/xcodec_post_quantized/embeddings.npz
 ```
 
 SSL encoder 最后一层 latent：

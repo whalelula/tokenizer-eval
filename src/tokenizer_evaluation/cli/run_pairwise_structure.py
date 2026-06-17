@@ -28,6 +28,7 @@ ORDER_CHECK_COLUMNS = (
     "filepath",
     "filename",
 )
+ORDER_IDENTITY_COLUMNS = ("id", "note_str", "track_id", "filename")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -104,7 +105,11 @@ def main() -> None:
     except ValueError as exc:
         parser.error(str(exc))
 
-    embeddings_a, embeddings_b, metadata, alignment = _load_align_and_sample(args)
+    try:
+        embeddings_a, embeddings_b, metadata, alignment = _load_align_and_sample(args)
+    except ValueError as exc:
+        parser.error(str(exc))
+
     output_dir = args.output_dir or _default_output_dir(dataset, tokenizer_a, tokenizer_b)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -237,14 +242,21 @@ def _align_by_order(
             f"({len(metadata_a)} rows in A, {len(metadata_b)} rows in B)."
         )
 
-    mismatched_columns = [
+    checked_columns = [
         column
         for column in ORDER_CHECK_COLUMNS
-        if column in metadata_a.columns
-        and column in metadata_b.columns
-        and not _series_equal_for_alignment(metadata_a[column], metadata_b[column])
+        if column in metadata_a.columns and column in metadata_b.columns
     ]
-    if mismatched_columns:
+    matching_columns = [
+        column
+        for column in checked_columns
+        if _series_equal_for_alignment(metadata_a[column], metadata_b[column])
+    ]
+    mismatched_columns = [column for column in checked_columns if column not in matching_columns]
+    matching_identity_columns = [
+        column for column in matching_columns if column in ORDER_IDENTITY_COLUMNS
+    ]
+    if mismatched_columns and not matching_identity_columns:
         columns = ", ".join(mismatched_columns)
         raise ValueError(
             "The two metadata files do not appear to use the same row order. "
@@ -257,11 +269,9 @@ def _align_by_order(
         metadata_a.reset_index(drop=True),
         {
             "mode": "row_order",
-            "checked_columns": [
-                column
-                for column in ORDER_CHECK_COLUMNS
-                if column in metadata_a.columns and column in metadata_b.columns
-            ],
+            "checked_columns": checked_columns,
+            "matching_columns": matching_columns,
+            "mismatched_columns": mismatched_columns,
             "num_items_after_join": int(len(metadata_a)),
         },
     )

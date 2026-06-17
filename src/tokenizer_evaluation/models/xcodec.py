@@ -220,3 +220,21 @@ class XCodecVAELatentExtractor(XCodecExtractor):
 
     def __init__(self, *args, representation: str = "vae_latent", **kwargs) -> None:
         super().__init__(*args, representation=representation, **kwargs)
+
+
+class XCodecPreQuantizedExtractor(XCodecExtractor):
+    """X-Codec fused acoustic+semantic latent before quantization."""
+
+    name = "x-codec-pre-quantized"
+
+    def __init__(self, *args, representation: str = "pre_quantized", **kwargs) -> None:
+        super().__init__(*args, representation=representation, **kwargs)
+
+
+class XCodecPostQuantizedExtractor(XCodecExtractor):
+    """X-Codec first continuous post-quantizer latent."""
+
+    name = "x-codec-post-quantized"
+
+    def __init__(self, *args, representation: str = "quantized", **kwargs) -> None:
+        super().__init__(*args, representation=representation, **kwargs)

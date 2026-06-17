@@ -12,7 +12,13 @@ from .same import SAMEExtractor
 from .speechtokenizer import SpeechTokenizerExtractor
 from .stable_audio_open import StableAudioOpenVAEExtractor
 from .wavcube import WavCubeExtractor
-from .xcodec import XCodecExtractor, XCodecSSLLatentExtractor, XCodecVAELatentExtractor
+from .xcodec import (
+    XCodecExtractor,
+    XCodecPostQuantizedExtractor,
+    XCodecPreQuantizedExtractor,
+    XCodecSSLLatentExtractor,
+    XCodecVAELatentExtractor,
+)
 
 EXTRACTORS = {
     "atst": ATSTExtractor,
@@ -29,6 +35,14 @@ EXTRACTORS = {
     "wavcube": WavCubeExtractor,
     "x-codec": XCodecExtractor,
     "xcodec": XCodecExtractor,
+    "x-codec-pre-quantized": XCodecPreQuantizedExtractor,
+    "xcodec-pre-quantized": XCodecPreQuantizedExtractor,
+    "x-codec-concat-latent": XCodecPreQuantizedExtractor,
+    "xcodec-concat-latent": XCodecPreQuantizedExtractor,
+    "x-codec-post-quantized": XCodecPostQuantizedExtractor,
+    "xcodec-post-quantized": XCodecPostQuantizedExtractor,
+    "x-codec-quantized": XCodecPostQuantizedExtractor,
+    "xcodec-quantized": XCodecPostQuantizedExtractor,
     "x-codec-ssl-latent": XCodecSSLLatentExtractor,
     "xcodec-ssl-latent": XCodecSSLLatentExtractor,
     "x-codec-ssl": XCodecSSLLatentExtractor,
@@ -54,6 +68,8 @@ __all__ = [
     "StableAudioOpenVAEExtractor",
     "WavCubeExtractor",
     "XCodecExtractor",
+    "XCodecPostQuantizedExtractor",
+    "XCodecPreQuantizedExtractor",
     "XCodecSSLLatentExtractor",
     "XCodecVAELatentExtractor",
     "resolve_device",

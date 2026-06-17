@@ -23,6 +23,8 @@ tokenizer 选项：
 - `wavcube`: WavCube
 - `speechtokenizer`: SpeechTokenizer
 - `x-codec`: X-Codec
+- `x-codec-pre-quantized`: X-Codec acoustic+semantic concat/fc latent before quantization
+- `x-codec-post-quantized`: X-Codec first continuous latent after quantization
 - `x-codec-ssl-latent`: X-Codec SSL encoder latent before quantization
 - `x-codec-vae-latent`: X-Codec VAE encoder latent before quantization
 - `mucodec`: MuCodec
@@ -65,8 +67,8 @@ run-pairwise-structure `
   --dataset nsynth `
   --tokenizer-a same `
   --tokenizer-b mert `
-  --embeddings-a outputs/nsynth_instrument/same/embeddings.npz `
-  --embeddings-b outputs/nsynth_instrument/mert/embeddings.npz `
+  --embeddings-a outputs/same-l/embeddings.npz `
+  --embeddings-b outputs/mert_330m_l12/embeddings.npz `
   --k 5 10 30 50
 ```
 
